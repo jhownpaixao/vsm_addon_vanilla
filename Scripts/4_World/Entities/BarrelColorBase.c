@@ -33,7 +33,6 @@ modded class Barrel_ColorBase : Container_Base
             VSM_StopAutoClose();
         }
             
-
         super.Close();
     }
 
@@ -50,6 +49,8 @@ modded class Barrel_ColorBase : Container_Base
 
     override void VSM_Open()
     {
+        super.VSM_Open();
+
         if (!VSM_IsOpen())
         {
             Open();
@@ -58,13 +59,13 @@ modded class Barrel_ColorBase : Container_Base
 
     override void VSM_Close()
 	{
+        super.VSM_Close();
+
 		if (VSM_IsAttachedOnVehicle())
 		{
 			VSM_StartAutoClose(); //reinicia ciclo
-			return;
 		}
-
-		if (VSM_IsOpen())
+        else if (VSM_IsOpen())
 		{
 			if (GetGame().IsServer())
 				VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
@@ -100,9 +101,9 @@ modded class Barrel_ColorBase : Container_Base
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version)
     {
-        if (!super.OnStoreLoad(ctx, version))
-            return false;
-        ctx.Read(m_VSM_HasVirtualItems)
+        if (!super.OnStoreLoad(ctx, version))  return false;
+        ctx.Read(m_VSM_HasVirtualItems);
+        
         return true;
     }
 
@@ -114,6 +115,8 @@ modded class Barrel_ColorBase : Container_Base
 
     override void VSM_OnBeforeVirtualize()
     {
+        super.VSM_OnBeforeVirtualize();
+        
         if (!VSM_IsOpen()) //! se estiver fechado, os itens são perdidos, caso seja virtualizado dentro de outro container
             VSM_Open();
     }

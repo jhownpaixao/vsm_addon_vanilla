@@ -1,38 +1,45 @@
 modded class TentBase
 {
-    protected bool m_LastOpen;
-
     void TentBase()
     {
         VSM_StartAutoClose();
-        m_LastOpen = VSM_IsOpen();
     }
 
     //! mesclar caracteristicas do storage para virtual
+    override bool CanBePacked()
+    {
+        if(super.CanBePacked())
+        {
+            return !m_VSM_HasVirtualItems;
+        }
+        return false;
+    }
+    
     override void ToggleAnimation(string selection)
     {
         super.ToggleAnimation(selection);
-        // Print("ToggleAnimation selection=" + selection + " VSM_IsOpen()=" + VSM_IsOpen());
+        
         if (GetGame().IsServer())
         {
             if (selection.Contains("entrance") || selection.Contains("door"))
             {
-                if (VSM_IsOpen() != m_LastOpen)
-                {
                     if (VSM_IsOpen())
                     {
-                        VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+                        if(VSM_HasVirtualItems())
+                            VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
                     }
-                    else
+                    else 
                     {
-                        VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
+                        if(!VSM_HasVirtualItems())
+                            VirtualStorageModule.GetModule().OnSaveVirtualStore(this);    
                     }
-
-                    m_LastOpen = VSM_IsOpen();
-                }
-
             }
         }
+    }
+
+    override bool CanDisplayCargo()
+    {
+        return VSM_IsOpen();
     }
 
     //! virtualização
@@ -59,6 +66,8 @@ modded class TentBase
 
     override void VSM_Open()
     {
+        super.VSM_Open();
+
         if (VSM_IsOpen())
             return;
 
@@ -103,10 +112,10 @@ modded class TentBase
 
     override void VSM_Close()
     {
+        super.VSM_Close();
+        
         if (!VSM_IsOpen())
             return;
-
-        // Print("Fechando tenda " + GetType());
 
         foreach (ToggleAnimations toggle, bool state: m_ToggleAnimations)
 		{
@@ -118,11 +127,9 @@ modded class TentBase
 
             if (toggle_off.Contains("entrance") || toggle_off.Contains("door"))
             {
-                // Print("toggle_off =" + toggle_off);
 
                 if (VSM_IsOpen())
                 {
-                    // Print("toggle_off fechando =" + toggle_off);
                     if (CanToggleAnimations(toggle_off))
                         ToggleAnimation(toggle_off);
                 }
@@ -130,11 +137,8 @@ modded class TentBase
 
             if (toggle_on.Contains("entrance") || toggle_on.Contains("door"))
             {
-                // Print("toggle_on =" + toggle_off);
-
                 if (VSM_IsOpen())
                 {
-                    // Print("toggle_on fechando =" + toggle_off);
                     if (CanToggleAnimations(toggle_off))
                         ToggleAnimation(toggle_on);
                 }
