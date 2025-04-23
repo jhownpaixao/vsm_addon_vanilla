@@ -17,6 +17,12 @@ modded class TentBase
     
     override void ToggleAnimation(string selection)
     {
+        if(VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+          
         super.ToggleAnimation(selection);
         
         if (GetGame().IsServer())
@@ -26,21 +32,75 @@ modded class TentBase
                     if (VSM_IsOpen())
                     {
                         if(VSM_HasVirtualItems())
-                            VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+                            VirtualStorageModule.GetModule().OnLoadVirtualStore(this);     
                     }
                     else 
                     {
                         if(!VSM_HasVirtualItems())
-                            VirtualStorageModule.GetModule().OnSaveVirtualStore(this);    
+                            VirtualStorageModule.GetModule().OnSaveVirtualStore(this);        
                     }
             }
         }
     }
 
+    override bool CanReceiveItemIntoCargo(EntityAI item)
+    {
+        if (VSM_CanManipule())
+            return super.CanReceiveItemIntoCargo(item);
+
+        return false;
+    }
+
+    override bool CanReleaseCargo(EntityAI cargo)
+    {
+        if (VSM_CanManipule())
+            return super.CanReleaseCargo(cargo);
+
+        return false;
+    }
+
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
+    {
+        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
+        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
+        if (VSM_IsOpen() /* && !VSM_CanManipule() */) 
+            return super.CanReceiveAttachment(attachment, slotId);
+
+        return false;
+
+    }
+
+    override bool CanReleaseAttachment(EntityAI attachment)
+    {
+        if (VSM_CanManipule())
+            return super.CanReleaseAttachment(attachment);
+
+        return false;
+    }
+
+    override bool CanDisplayAttachmentSlot(int slot_id)
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayAttachmentSlot(slot_id);
+
+        return false;
+    }
+
     override bool CanDisplayCargo()
     {
-        return VSM_IsOpen();
+        if (VSM_IsOpen())
+            return super.CanDisplayCargo();
+            
+        return false;
     }
+
+    bool CanDisplayAttachmentCategory( string category_name )
+	{
+		if (VSM_CanManipule())
+            return super.CanDisplayAttachmentCategory(category_name);
+
+        return false;
+	}
 
     //! virtualização
     override bool VSM_IsOpen()
@@ -66,12 +126,11 @@ modded class TentBase
 
     override void VSM_Open()
     {
-        super.VSM_Open();
 
         if (VSM_IsOpen())
             return;
 
-        // Print("Abrindo tenda");
+
         foreach (ToggleAnimations toggle, bool state: m_ToggleAnimations)
 		{
             string toggle_on = toggle.GetToggleOn();
@@ -82,11 +141,9 @@ modded class TentBase
 
             if (toggle_off.Contains("entrance") || toggle_off.Contains("door"))
             {
-                // Print("toggle_off =" + toggle_off);
 
                 if (!VSM_IsOpen())
                 {
-                    // Print("abrindo com toggle_off =" + toggle_off);
                     ToggleAnimation(toggle_off);
                     return;
                 }
@@ -94,14 +151,9 @@ modded class TentBase
 
             if (toggle_on.Contains("entrance") || toggle_on.Contains("door"))
             {
-                // Print("toggle_on =" + toggle_on);
-
                 if (!VSM_IsOpen())
-                {
-                    // Print("abrindo com toggle_on =" + toggle_on);
-
                     ToggleAnimation(toggle_on);
-                }
+                
             }
 
             if (VSM_IsOpen())
@@ -112,8 +164,7 @@ modded class TentBase
 
     override void VSM_Close()
     {
-        super.VSM_Close();
-        
+
         if (!VSM_IsOpen())
             return;
 
@@ -170,6 +221,13 @@ modded class TentBase
             VirtualStorageModule.GetModule().OnDeleteContainer(this);
 
     }
+
+    override void OnDamageDestroyed(int oldLevel)
+	{
+		super.OnDamageDestroyed(oldLevel);
+		if (GetGame().IsServer())
+            VirtualStorageModule.GetModule().OnDestroyed(this);
+	};
 
     override void OnStoreSave(ParamsWriteContext ctx)
     {

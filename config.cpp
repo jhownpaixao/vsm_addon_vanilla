@@ -5,7 +5,7 @@ class CfgPatches
 		units[] = {};
 		weapons[] = {};
 		requiredVersion = 0.1;
-		requiredAddons[] = {"DZ_Data", "DZ_Scripts", "VSM_Core"};
+		requiredAddons[] = {"DZ_Data", "DZ_Scripts", "DZ_Gear_Camping", "VSM_Core"};
 	};
 };
 
@@ -37,3 +37,72 @@ class CfgMods
 		};
 	};
 };
+
+class CfgVehicles
+{
+	class TentBase;
+	class MediumTent: TentBase
+	{
+		class DamageSystem
+		{
+			class DamageZones
+			{
+				class Entrance
+				{
+					class Health
+					{
+						hitpoints=99999999;
+					};
+				};
+			};
+		};
+	};
+	class LargeTent: TentBase
+	{
+		class DamageSystem
+		{
+			class DamageZones
+			{
+				class Entrance
+				{
+					class Health
+					{
+						hitpoints=99999999;
+					};
+				};
+			};
+		};
+	};
+	class CarTent: TentBase
+	{
+		class DamageSystem
+		{
+			class DamageZones
+			{
+				class Entrance
+				{
+					class Health
+					{
+						hitpoints=99999999;
+					};
+				};
+			};
+		};
+	};
+	class PartyTent: TentBase
+	{
+		class DamageSystem
+		{
+			class DamageZones
+			{
+				class Door_Base
+				{
+					class Health
+					{
+						hitpoints=99999999;
+					};
+				};
+			};
+		};;
+	};
+}

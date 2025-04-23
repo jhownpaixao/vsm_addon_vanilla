@@ -42,31 +42,53 @@ modded class SeaChest
     // so aceita itens se estiver aberto
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
-        if (VSM_IsOpen())
+        if (VSM_CanManipule()|| VSM_IsAttachedOnVehicle())
             return super.CanReceiveItemIntoCargo(item);
 
         return false;
     }
-    
+
     override bool CanReleaseCargo(EntityAI cargo)
     {
-        return VSM_IsOpen();
+        if (VSM_CanManipule())
+            return super.CanReleaseCargo(cargo);
+
+        return false;
     }
 
-    override bool CanDisplayAttachmentSlot(int slot_id)
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        return VSM_IsOpen();
-    }
+        if (VSM_CanManipule() || VSM_IsAttachedOnVehicle())
+            return super.CanReceiveAttachment(attachment, slotId);
 
-    override bool CanDisplayCargo()
-    {
-        return VSM_IsOpen();
+        return false;
+
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
     {
-        return VSM_IsOpen();
+        if (VSM_CanManipule())
+            return super.CanReleaseAttachment(attachment);
+
+        return false;
     }
+
+    override bool CanDisplayAttachmentSlot(int slot_id)
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayAttachmentSlot(slot_id);
+
+        return false;
+    }
+
+    override bool CanDisplayCargo()
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayCargo();
+
+        return false;
+    }
+
 
     override bool IsTakeable()
     {
@@ -80,9 +102,9 @@ modded class SeaChest
 
     //! virtualização
     override bool VSM_CanVirtualize()
-	{
-		return !VSM_IsAttachedOnVehicle();
-	}
+    {
+        return !VSM_IsAttachedOnVehicle();
+    }
 
     override bool VSM_IsOpen()
     {
@@ -91,6 +113,12 @@ modded class SeaChest
 
     override void VSM_Open()
     {
+        if (VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+
         super.VSM_Open();
 
         if (!VSM_IsOpen())
@@ -103,29 +131,35 @@ modded class SeaChest
     }
 
     override void VSM_Close()
-	{
+    {
+        if (VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+
         super.VSM_Close();
 
-		if (VSM_IsAttachedOnVehicle())
-		{
-			VSM_StartAutoClose(); //reinicia ciclo
-		}
+        if (VSM_IsAttachedOnVehicle())
+        {
+            VSM_StartAutoClose(); //reinicia ciclo
+        }
         else if (VSM_IsOpen())
-		{
-			if (GetGame().IsServer())
-				VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
+        {
+            if (GetGame().IsServer())
+                VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
 
-			m_Openable.Close();
-			SetSynchDirty();
-		}
-	}
+            m_Openable.Close();
+            SetSynchDirty();
+        }
+    }
 
     override void EEInit()
     {
         super.EEInit();
 
         if (GetGame().IsServer())
-            VirtualStorageModule.GetModule().OnInitContainer(this); 
+            VirtualStorageModule.GetModule().OnInitContainer(this);
     }
 
     override void EEDelete(EntityAI parent)
@@ -135,6 +169,13 @@ modded class SeaChest
         if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDeleteContainer(this);
     }
+
+    override void OnDamageDestroyed(int oldLevel)
+    {
+        super.OnDamageDestroyed(oldLevel);
+        if (GetGame().IsServer())
+            VirtualStorageModule.GetModule().OnDestroyed(this);
+    };
 
     override void OnStoreSave(ParamsWriteContext ctx)
     {
@@ -159,7 +200,7 @@ modded class SeaChest
     override void VSM_OnBeforeVirtualize()
     {
         super.VSM_OnBeforeVirtualize();
-        
+
         if (!VSM_IsOpen()) //! se estiver fechado, os itens são perdidos, caso seja virtualizado dentro de outro container
             VSM_Open();
     }

@@ -36,9 +36,10 @@ modded class WoodenCrate
         VSM_Close();
     }
 
+    // so aceita itens se estiver aberto
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
-        if (VSM_IsOpen())
+        if (VSM_CanManipule() || VSM_IsAttachedOnVehicle())
             return super.CanReceiveItemIntoCargo(item);
 
         return false;
@@ -46,23 +47,44 @@ modded class WoodenCrate
 
     override bool CanReleaseCargo(EntityAI cargo)
     {
-        return VSM_IsOpen();
+        if (VSM_CanManipule())
+            return super.CanReleaseCargo(cargo);
+
+        return false;
     }
 
-    override bool CanDisplayAttachmentSlot(int slot_id)
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        return VSM_IsOpen();
-    }
+        if (VSM_CanManipule() || VSM_IsAttachedOnVehicle())
+            return super.CanReceiveAttachment(attachment, slotId);
 
-    override bool CanDisplayCargo()
-    {
-        return VSM_IsOpen();
+        return false;
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
     {
-        return VSM_IsOpen();
+        if (VSM_CanManipule())
+            return super.CanReleaseAttachment(attachment);
+
+        return false;
     }
+
+    override bool CanDisplayAttachmentSlot(int slot_id)
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayAttachmentSlot(slot_id);
+
+        return false;
+    }
+
+    override bool CanDisplayCargo()
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayCargo();
+
+        return false;
+    }
+
 
     override bool IsTakeable()
     {
@@ -87,6 +109,12 @@ modded class WoodenCrate
 
     override void VSM_Open()
 	{
+        if(VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+        
         super.VSM_Open();
 
 		if (!VSM_IsOpen())
@@ -101,6 +129,12 @@ modded class WoodenCrate
 
 	override void VSM_Close()
 	{
+        if(VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+
         super.VSM_Close();
 
 		if (VSM_IsAttachedOnVehicle())
@@ -133,6 +167,13 @@ modded class WoodenCrate
         if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDeleteContainer(this);
     }
+
+    override void OnDamageDestroyed(int oldLevel)
+	{
+		super.OnDamageDestroyed(oldLevel);
+		if (GetGame().IsServer())
+            VirtualStorageModule.GetModule().OnDestroyed(this);
+	};
 
     override void OnStoreSave(ParamsWriteContext ctx)
     {

@@ -22,9 +22,10 @@ modded class ShelterBase
         AddAction(ActionVSM_Close);
     }
 
+    // so aceita itens se estiver aberto
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
-        if (VSM_IsOpen())
+        if (VSM_CanManipule())
             return super.CanReceiveItemIntoCargo(item);
 
         return false;
@@ -32,23 +33,47 @@ modded class ShelterBase
 
     override bool CanReleaseCargo(EntityAI cargo)
     {
-        return VSM_IsOpen();
+        if (VSM_CanManipule())
+            return super.CanReleaseCargo(cargo);
+
+        return false;
     }
 
-    override bool CanDisplayAttachmentSlot(int slot_id)
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        return VSM_IsOpen();
-    }
+        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
+        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
+        if (VSM_IsOpen() /* && !VSM_IsProcessing() */) 
+            return super.CanReceiveAttachment(attachment, slotId);
 
-    override bool CanDisplayCargo()
-    {
-        return VSM_IsOpen();
+        return false;
+
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
     {
-        return VSM_IsOpen();
+        if (VSM_CanManipule())
+            return super.CanReleaseAttachment(attachment);
+
+        return false;
     }
+
+    override bool CanDisplayAttachmentSlot(int slot_id)
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayAttachmentSlot(slot_id);
+
+        return false;
+    }
+
+    override bool CanDisplayCargo()
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayCargo();
+
+        return false;
+    }
+
 
     //! virtualização
     override bool VSM_CanVirtualize()
@@ -74,6 +99,12 @@ modded class ShelterBase
 
     override void VSM_Open()
     {
+        if(VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+        
         super.VSM_Open();
 
         if (!VSM_IsOpen())
@@ -87,6 +118,12 @@ modded class ShelterBase
 
     override void VSM_Close()
     {
+        if(VSM_IsProcessing())
+        {
+            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+            return;
+        }
+
         super.VSM_Close();
 
         if (VSM_IsOpen())
@@ -113,6 +150,13 @@ modded class ShelterBase
         if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDeleteContainer(this);
     }
+
+    override void OnDamageDestroyed(int oldLevel)
+	{
+		super.OnDamageDestroyed(oldLevel);
+		if (GetGame().IsServer())
+            VirtualStorageModule.GetModule().OnDestroyed(this);
+	};
 
     override void OnStoreSave(ParamsWriteContext ctx)
     {
