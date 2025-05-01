@@ -10,6 +10,8 @@ modded class SeaChest
 
     override void InitItemVariables()
     {
+        super.InitItemVariables();
+
         m_Openable = new OpenableBehaviour(false);
         RegisterNetSyncVariableBool("m_Openable.m_IsOpened");
     }

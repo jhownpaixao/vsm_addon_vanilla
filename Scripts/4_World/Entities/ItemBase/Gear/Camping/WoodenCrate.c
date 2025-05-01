@@ -10,6 +10,8 @@ modded class WoodenCrate
 
     override void InitItemVariables()
     {
+        super.InitItemVariables();
+        
         m_Openable = new OpenableBehaviour(false);
         RegisterNetSyncVariableBool("m_Openable.m_IsOpened");
     }
@@ -84,7 +86,6 @@ modded class WoodenCrate
 
         return false;
     }
-
 
     override bool IsTakeable()
     {
