@@ -109,49 +109,35 @@ modded class WoodenCrate
     }
 
     override void VSM_Open()
-	{
-        if(VSM_IsProcessing())
+    {
+        if (VSM_CanOpen())
         {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
+            super.VSM_Open();
+            m_Openable.Open();
+
+            if (GetGame().IsServer() && VSM_IsOpen())
+                VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+            
+            SetSynchDirty();
         }
-        
-        super.VSM_Open();
+    }
 
-		if (!VSM_IsOpen())
-		{
-			m_Openable.Open();
-
-			if (GetGame().IsServer())
-				VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
-			SetSynchDirty();
-		}
-	}
-
-	override void VSM_Close()
-	{
-        if(VSM_IsProcessing())
+    override void VSM_Close()
+    {
+        if (VSM_IsAttachedOnVehicle())
         {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
+            VSM_StartAutoClose(); //reinicia ciclo
         }
-
-        super.VSM_Close();
-
-		if (VSM_IsAttachedOnVehicle())
-		{
-			VSM_StartAutoClose(); //reinicia ciclo
-			return;
-		}
-        else if (VSM_IsOpen())
-		{
-			if (GetGame().IsServer())
-				VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
-
-			m_Openable.Close();
+        else if (VSM_CanClose())
+        {
+            if (GetGame().IsServer())
+                VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
+            
+            super.VSM_Close();
+            m_Openable.Close();
 			SetSynchDirty();
-		}
-	}
+        }
+    }
 
     override void EEInit()
     {
@@ -179,15 +165,20 @@ modded class WoodenCrate
     override void OnStoreSave(ParamsWriteContext ctx)
     {
         super.OnStoreSave(ctx);
-        ctx.Write(m_VSM_HasVirtualItems);
+
+        if(!VirtualStorageModule.GetModule().IsRemoving())
+            ctx.Write(m_VSM_HasVirtualItems);
     }
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version)
     {
         if (!super.OnStoreLoad(ctx, version))
             return false;
-        ctx.Read(m_VSM_HasVirtualItems)
-            return true;
+        
+        if(!VirtualStorageModule.GetModule().IsNew())
+            ctx.Read(m_VSM_HasVirtualItems);
+
+        return true;
     }
 
     override void AfterStoreLoad()

@@ -24,7 +24,6 @@ modded class PartyTent //forçar um override para evitar outros mods
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
-
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
@@ -51,7 +50,7 @@ modded class PartyTent //forçar um override para evitar outros mods
         return false;
     }
 
-    bool CanDisplayAttachmentCategory( string category_name )
+    override bool CanDisplayAttachmentCategory( string category_name )
 	{
 		if (VSM_CanManipule())
             return super.CanDisplayAttachmentCategory(category_name);

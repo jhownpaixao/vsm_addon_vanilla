@@ -163,14 +163,19 @@ modded class ShelterBase
     override void OnStoreSave(ParamsWriteContext ctx)
     {
         super.OnStoreSave(ctx);
-        ctx.Write(m_VSM_HasVirtualItems);
+
+        if(!VirtualStorageModule.GetModule().IsRemoving())
+            ctx.Write(m_VSM_HasVirtualItems);
     }
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version)
     {
         if (!super.OnStoreLoad(ctx, version))
             return false;
-        ctx.Read(m_VSM_HasVirtualItems)
+        
+        if(!VirtualStorageModule.GetModule().IsNew())
+            ctx.Read(m_VSM_HasVirtualItems);
+
         return true;
     }
 

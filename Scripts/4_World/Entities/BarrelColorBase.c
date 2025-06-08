@@ -19,33 +19,27 @@ modded class Barrel_ColorBase : Container_Base
 
     override void Open()
     {
-        if(VSM_IsProcessing())
+        if (VSM_CanOpen())
         {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
-        }
-          
-        super.Open();
+            super.Open();
 
-        if (GetGame().IsServer())
-            VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+            if (GetGame().IsServer() && VSM_IsOpen())
+                VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+            
+            SetSynchDirty();
+        }
     }
 
     override void Close()
     {
-        if(VSM_IsProcessing())
+        if (VSM_CanClose())
         {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
+            if (GetGame().IsServer())
+                VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
+            
+            super.Close();
+			SetSynchDirty();
         }
-        
-        if (GetGame().IsServer())
-        {
-            VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
-            VSM_StopAutoClose();
-        }
-
-        super.Close();
     }
 
     override bool IsEmpty()
@@ -168,18 +162,22 @@ modded class Barrel_ColorBase : Container_Base
 		super.OnDamageDestroyed(oldLevel);
 		if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDestroyed(this);
-	};
+	}
 
     override void OnStoreSave(ParamsWriteContext ctx)
     {
         super.OnStoreSave(ctx);
-        ctx.Write(m_VSM_HasVirtualItems);
+
+        if(!VirtualStorageModule.GetModule().IsRemoving())
+            ctx.Write(m_VSM_HasVirtualItems);
     }
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version)
     {
         if (!super.OnStoreLoad(ctx, version)) return false;
-        ctx.Read(m_VSM_HasVirtualItems);
+        
+        if(!VirtualStorageModule.GetModule().IsNew())
+            ctx.Read(m_VSM_HasVirtualItems);
 
         return true;
     }
@@ -197,4 +195,12 @@ modded class Barrel_ColorBase : Container_Base
         if (!VSM_IsOpen()) //! se estiver fechado, os itens são perdidos, caso seja virtualizado dentro de outro container
             VSM_Open();
     }
+
+    override void VSM_OnAfterRestore() 
+    {
+        super.VSM_OnAfterRestore();
+
+        if (VSM_IsOpen()) //! se estiver aberto não será possível remove-lo do inventário em que se encontra
+            VSM_Close();
+    } 
 }

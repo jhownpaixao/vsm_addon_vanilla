@@ -51,7 +51,7 @@ modded class CarTent //forçar um override para evitar outros mods
         return false;
     }
 
-    bool CanDisplayAttachmentCategory( string category_name )
+    override bool CanDisplayAttachmentCategory( string category_name )
 	{
 		if (VSM_IsOpen())
             return super.CanDisplayAttachmentCategory(category_name);

@@ -115,44 +115,32 @@ modded class SeaChest
 
     override void VSM_Open()
     {
-        if (VSM_IsProcessing())
+        if (VSM_CanOpen())
         {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
-        }
-
-        super.VSM_Open();
-
-        if (!VSM_IsOpen())
-        {
+            super.VSM_Open();
             m_Openable.Open();
 
-            if (GetGame().IsServer())
+            if (GetGame().IsServer() && VSM_IsOpen())
                 VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+            
+            SetSynchDirty();
         }
     }
 
     override void VSM_Close()
     {
-        if (VSM_IsProcessing())
-        {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
-        }
-
-        super.VSM_Close();
-
         if (VSM_IsAttachedOnVehicle())
         {
             VSM_StartAutoClose(); //reinicia ciclo
         }
-        else if (VSM_IsOpen())
+        else if (VSM_CanClose())
         {
             if (GetGame().IsServer())
                 VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
-
+            
+            super.VSM_Close();
             m_Openable.Close();
-            SetSynchDirty();
+			SetSynchDirty();
         }
     }
 
@@ -182,14 +170,19 @@ modded class SeaChest
     override void OnStoreSave(ParamsWriteContext ctx)
     {
         super.OnStoreSave(ctx);
-        ctx.Write(m_VSM_HasVirtualItems);
+
+        if(!VirtualStorageModule.GetModule().IsRemoving())
+            ctx.Write(m_VSM_HasVirtualItems);
     }
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version)
     {
         if (!super.OnStoreLoad(ctx, version))
             return false;
-        ctx.Read(m_VSM_HasVirtualItems)
+
+        if(!VirtualStorageModule.GetModule().IsNew())
+            ctx.Read(m_VSM_HasVirtualItems);
+            
         return true;
     }
 

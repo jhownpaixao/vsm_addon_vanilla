@@ -1,46 +1,53 @@
 modded class TentBase
 {
+    bool m_VSM_LastOpenState;
+
     void TentBase()
     {
         VSM_StartAutoClose();
     }
 
+    override void InitItemVariables()
+    {
+        super.InitItemVariables();
+
+        m_VSM_LastOpenState = VSM_IsOpen();
+        RegisterNetSyncVariableBool("m_VSM_LastOpenState");
+    }
+
     //! mesclar caracteristicas do storage para virtual
     override bool CanBePacked()
     {
-        if(super.CanBePacked())
+        if (super.CanBePacked())
         {
             return !m_VSM_HasVirtualItems;
         }
         return false;
     }
-    
+
     override void ToggleAnimation(string selection)
     {
-        if(VSM_IsProcessing())
-        {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
+        if (VSM_IsProcessing())
             return;
-        }
-          
+
         super.ToggleAnimation(selection);
-        
+
         if (GetGame().IsServer())
         {
-            if (selection.Contains("entrance") || selection.Contains("door"))
+            if (m_VSM_LastOpenState != VSM_IsOpen())
             {
+                m_VSM_LastOpenState = VSM_IsOpen();
+                if (selection.Contains("entrance") || selection.Contains("door"))
+                {
                     if (VSM_IsOpen())
-                    {
-                        if(VSM_HasVirtualItems())
-                            VirtualStorageModule.GetModule().OnLoadVirtualStore(this);     
-                    }
-                    else 
-                    {
-                        if(!VSM_HasVirtualItems())
-                            VirtualStorageModule.GetModule().OnSaveVirtualStore(this);        
-                    }
+                        VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+                    else
+                        VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
+                }
+                SetSynchDirty();
             }
         }
+
     }
 
     override bool CanReceiveItemIntoCargo(EntityAI item)
@@ -63,7 +70,7 @@ modded class TentBase
     {
         //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
         //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
-        if (VSM_IsOpen() /* && !VSM_CanManipule() */) 
+        if (VSM_IsOpen() /* && !VSM_CanManipule() */)
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
@@ -90,33 +97,35 @@ modded class TentBase
     {
         if (VSM_IsOpen())
             return super.CanDisplayCargo();
-            
+
         return false;
     }
 
-    bool CanDisplayAttachmentCategory( string category_name )
-	{
-		if (VSM_CanManipule())
+    override bool CanDisplayAttachmentCategory(string category_name)
+    {
+        if (VSM_CanManipule())
             return super.CanDisplayAttachmentCategory(category_name);
 
         return false;
-	}
+    }
 
     //! virtualização
     override bool VSM_IsOpen()
     {
-        if (!m_OpeningMask)
-            return true;
+        if (m_State != PACKED)
+        {
+            bool is_closed;
+            string component;
+            ToggleAnimations toggle;
 
-        foreach (ToggleAnimations toggle, bool state: m_ToggleAnimations)
-		{
-            string toggle_off = toggle.GetToggleOff();
-            toggle_off.ToLower();
-
-            if (toggle_off.Contains("entrance") || toggle_off.Contains("door"))
+            for (int i = 0; i < m_ToggleAnimations.Count(); i++)
             {
-                bool is_closed = m_OpeningMask & toggle.GetOpeningBit();
-                if (!is_closed || IsSelectionRuined(toggle_off))
+                toggle = m_ToggleAnimations.GetKey(i);
+                is_closed = m_OpeningMask & toggle.GetOpeningBit();
+                component = toggle.GetToggleOff(); //either one works
+                component.ToLower();
+
+                if (!is_closed)
                     return true;
             }
         }
@@ -130,77 +139,43 @@ modded class TentBase
         if (VSM_IsOpen())
             return;
 
+        bool is_closed;
+        string component;
+        ToggleAnimations toggle;
 
-        foreach (ToggleAnimations toggle, bool state: m_ToggleAnimations)
-		{
-            string toggle_on = toggle.GetToggleOn();
-            toggle_on.ToLower();
+        for (int i = 0; i < m_ToggleAnimations.Count(); i++)
+        {
+            toggle = m_ToggleAnimations.GetKey(i);
+            is_closed = m_OpeningMask & toggle.GetOpeningBit();
+            component = toggle.GetToggleOff(); //either one works
+            component.ToLower();
 
-            string toggle_off = toggle.GetToggleOff();
-            toggle_off.ToLower();
-
-            if (toggle_off.Contains("entrance") || toggle_off.Contains("door"))
-            {
-
-                if (!VSM_IsOpen())
-                {
-                    ToggleAnimation(toggle_off);
-                    return;
-                }
-            }
-
-            if (toggle_on.Contains("entrance") || toggle_on.Contains("door"))
-            {
-                if (!VSM_IsOpen())
-                    ToggleAnimation(toggle_on);
-                
-            }
-
-            if (VSM_IsOpen())
-                break;
+            if (is_closed)
+                ToggleAnimation(component);
         }
-
     }
 
     override void VSM_Close()
     {
-
         if (!VSM_IsOpen())
             return;
 
-        foreach (ToggleAnimations toggle, bool state: m_ToggleAnimations)
-		{
-            string toggle_on = toggle.GetToggleOn();
-            toggle_on.ToLower();
+        bool is_closed;
+        string component;
+        ToggleAnimations toggle;
 
-            string toggle_off = toggle.GetToggleOff();
-            toggle_off.ToLower();
+        for (int i = 0; i < m_ToggleAnimations.Count(); i++)
+        {
+            toggle = m_ToggleAnimations.GetKey(i);
+            is_closed = m_OpeningMask & toggle.GetOpeningBit();
+            component = toggle.GetToggleOff(); //either one works
+            component.ToLower();
 
-            if (toggle_off.Contains("entrance") || toggle_off.Contains("door"))
+            if (!is_closed)
             {
-
-                if (VSM_IsOpen())
-                {
-                    if (CanToggleAnimations(toggle_off))
-                        ToggleAnimation(toggle_off);
-                }
-            }
-
-            if (toggle_on.Contains("entrance") || toggle_on.Contains("door"))
-            {
-                if (VSM_IsOpen())
-                {
-                    if (CanToggleAnimations(toggle_off))
-                        ToggleAnimation(toggle_on);
-                }
-            }
-
-            if (!VSM_IsOpen())
-                break;
+                ToggleAnimation(component);
+            }   
         }
-
-        if (VSM_IsOpen())
-            VSM_StartAutoClose();
     }
 
     override void EEInit()
@@ -223,16 +198,18 @@ modded class TentBase
     }
 
     override void OnDamageDestroyed(int oldLevel)
-	{
-		super.OnDamageDestroyed(oldLevel);
-		if (GetGame().IsServer())
+    {
+        super.OnDamageDestroyed(oldLevel);
+        if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDestroyed(this);
-	};
+    }
 
     override void OnStoreSave(ParamsWriteContext ctx)
     {
         super.OnStoreSave(ctx);
-        ctx.Write(m_VSM_HasVirtualItems);
+
+        if (!VirtualStorageModule.GetModule().IsRemoving())
+            ctx.Write(m_VSM_HasVirtualItems);
     }
 
     override bool OnStoreLoad(ParamsReadContext ctx, int version)
@@ -240,7 +217,8 @@ modded class TentBase
         if (!super.OnStoreLoad(ctx, version))
             return false;
 
-        ctx.Read(m_VSM_HasVirtualItems)
+        if (!VirtualStorageModule.GetModule().IsNew())
+            ctx.Read(m_VSM_HasVirtualItems);
 
         return true;
     }
@@ -253,10 +231,9 @@ modded class TentBase
 
     //! utils
     bool IsSelectionRuined(string selection)
-	{
-		string zone;
-		DamageSystem.GetDamageZoneFromComponentName(this, selection, zone);
-		return GetHealthLevel(zone) == GameConstants.STATE_RUINED;
-	}
-
+    {
+        string zone;
+        DamageSystem.GetDamageZoneFromComponentName(this, selection, zone);
+        return GetHealthLevel(zone) == GameConstants.STATE_RUINED;
+    }
 }
