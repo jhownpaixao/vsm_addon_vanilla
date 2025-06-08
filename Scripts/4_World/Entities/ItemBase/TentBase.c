@@ -202,6 +202,9 @@ modded class TentBase
         super.OnDamageDestroyed(oldLevel);
         if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDestroyed(this);
+
+        VSM_Open();
+        VSM_StopAutoClose();
     }
 
     override void OnStoreSave(ParamsWriteContext ctx)
