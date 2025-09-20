@@ -25,10 +25,16 @@ class CfgMods
 		version = "1.0.0";
 		extra = 0;
 		type = "mod";
-		dependencies[]= {"World"};
+		dependencies[]= {"World", "Game"};
 
 		class defs
 		{
+			class gameScriptModule
+			{
+				value = "";
+				files[] = {"vsm_addon_vanilla/Scripts/3_Game"};
+			};
+			
 			class worldScriptModule
 			{
 				value = "";

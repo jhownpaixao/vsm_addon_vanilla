@@ -1,20 +1,21 @@
 modded class Barrel_ColorBase : Container_Base
 {
-    //! mesclar caracteristicas do storage para virtual
+
+    //Behaviour overrides----------------------------------------
     override bool CanPutInCargo(EntityAI parent)
     {
-        if (!super.CanPutInCargo(parent))
-            return false;
+        if(!VSM_HasVirtualItems())
+            return super.CanPutInCargo(parent);
 
-        return !VSM_HasVirtualItems();
+        return false;
     }
 
     override bool CanPutIntoHands(EntityAI parent)
     {
-        if (!super.CanPutIntoHands(parent))
-            return false;
+        if(!VSM_HasVirtualItems())
+            return super.CanPutIntoHands(parent);
 
-        return !VSM_HasVirtualItems();
+        return false;
     }
 
     override void Open()
@@ -26,7 +27,7 @@ modded class Barrel_ColorBase : Container_Base
             if (GetGame().IsServer() && VSM_IsOpen())
                 VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
             
-            SetSynchDirty();
+            VSM_GetAutoCloseBehavior().Start();
         }
     }
 
@@ -38,19 +39,18 @@ modded class Barrel_ColorBase : Container_Base
                 VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
             
             super.Close();
-			SetSynchDirty();
+            VSM_GetAutoCloseBehavior().Stop();
         }
     }
 
     override bool IsEmpty()
     {
-        if (VSM_HasVirtualItems())
-            return false;
+        if (!VSM_HasVirtualItems())
+            return super.IsEmpty();
 
-        return super.IsEmpty();
+        return false;
     }
 
-    // so aceita itens se estiver aberto
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
         if (VSM_CanManipule() || VSM_IsAttachedOnVehicle())
@@ -73,7 +73,6 @@ modded class Barrel_ColorBase : Container_Base
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
-
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
@@ -100,9 +99,21 @@ modded class Barrel_ColorBase : Container_Base
         return false;
     }
 
-    //! virtualização
+    //VSM adjustments----------------------------------------
+    override bool VSM_IsVirtualizable()
+    {
+        if(super.VSM_IsVirtualizable())
+        {
+            //! Não pode ser virtualizado por outro storage se tiver itens virtuais ou for attachment
+            return !VSM_HasVirtualItems() && !GetInventory().IsAttachment();
+        }
+        
+        return true;
+    }
+
     override bool VSM_CanVirtualize()
     {
+        //! Não pode virtualizar se estiver em um veículo
         return !VSM_IsAttachedOnVehicle();
     }
 
@@ -127,7 +138,7 @@ modded class Barrel_ColorBase : Container_Base
 
         if (VSM_IsAttachedOnVehicle())
         {
-            VSM_StartAutoClose(); //reinicia ciclo
+            VSM_GetAutoCloseBehavior().Start(); //reinicia ciclo
         }
         else if (VSM_IsOpen())
         {
@@ -135,10 +146,10 @@ modded class Barrel_ColorBase : Container_Base
                 VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
 
             m_Openable.Close();
-            SetSynchDirty();
         }
     }
 
+    //VSM Wrapper events ----------------------------------------
     override void EEInit()
     {
         super.EEInit();
@@ -165,42 +176,55 @@ modded class Barrel_ColorBase : Container_Base
 	}
 
     override void OnStoreSave(ParamsWriteContext ctx)
-    {
-        super.OnStoreSave(ctx);
+	{
+		super.OnStoreSave(ctx);
+        if(VirtualStorageModule.GetModule().IsRemoving()) return;
 
-        if(!VirtualStorageModule.GetModule().IsRemoving())
-            ctx.Write(m_VSM_HasVirtualItems);
-    }
-
-    override bool OnStoreLoad(ParamsReadContext ctx, int version)
-    {
-        if (!super.OnStoreLoad(ctx, version)) return false;
+        ctx.Write(m_VSM_HasVirtualItems);
+	}
+	
+	override bool OnStoreLoad(ParamsReadContext ctx, int version)
+	{
+		if(!super.OnStoreLoad(ctx, version)) return false;
         
-        if(!VirtualStorageModule.GetModule().IsNew())
-            ctx.Read(m_VSM_HasVirtualItems);
+		//TODO este seria o certo, mas os servers em produção ainda não tem este recurso e vão falhar
+        //TODO primeiro lançar uma att com ele, e na proxima desativa-lo
+		// if(VSM_Addon_Vanilla.GetAddon().IsNew()) return true; 
 
-        return true;
-    }
+        if(!ctx.Read(m_VSM_HasVirtualItems)) return false;
+        
+        SetSynchDirty();
 
-    override void AfterStoreLoad()
-    {
-        super.AfterStoreLoad();
-        VSM_SetHasItems(m_VSM_HasVirtualItems);
-    }
+		return true;
+	}
 
+    //! compatibilidade---------------------------------------------------
     override void VSM_OnBeforeVirtualize()
     {
         super.VSM_OnBeforeVirtualize();
 
-        if (!VSM_IsOpen()) //! se estiver fechado, os itens são perdidos, caso seja virtualizado dentro de outro container
+        //! se estiver fechado, os itens são perdidos, caso seja virtualizado dentro de outro container
+        if (!VSM_IsOpen()) 
             VSM_Open();
+    }
+
+    override void VSM_OnBeforeRestoreChildren() 
+    {
+        super.VSM_OnBeforeRestoreChildren();
+
+        //! abrir para restauarar os filhos (senão bloqueia)
+        m_Openable.Open();
     }
 
     override void VSM_OnAfterRestore() 
     {
         super.VSM_OnAfterRestore();
-
-        if (VSM_IsOpen()) //! se estiver aberto não será possível remove-lo do inventário em que se encontra
+        
+        //! após a restauração (como item), se nao for atached em um veículo, fecha para permitir remover de outros containers
+        if (!VSM_IsAttachedOnVehicle())
+        {
             VSM_Close();
+        }
     } 
+    //! ---------------------------------------------------
 }

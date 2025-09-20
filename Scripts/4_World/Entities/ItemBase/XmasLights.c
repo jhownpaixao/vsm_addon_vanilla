@@ -1,5 +1,17 @@
 modded class XmasLights
 {
+    override bool VSM_IsVirtualizable()
+    {
+        if(super.VSM_IsVirtualizable())
+        {
+            return !GetInventory().IsAttachment();
+        }
+        
+        return true;
+    }
+
+
+    //!legacy suport
     override bool VSM_CanVirtualize()
     {
         ItemBase parent = ItemBase.Cast(GetHierarchyParent());

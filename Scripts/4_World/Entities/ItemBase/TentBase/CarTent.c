@@ -1,5 +1,6 @@
-modded class CarTent //forçar um override para evitar outros mods
+modded class CarTent
 {
+    //Behaviour overrides----------------------------------------
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
         if (VSM_CanManipule())
@@ -18,13 +19,10 @@ modded class CarTent //forçar um override para evitar outros mods
 
     override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
-        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
-        if (VSM_IsOpen() /* && !VSM_IsProcessing() */) 
+        if (VSM_CanManipule()) 
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
-
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
@@ -53,7 +51,7 @@ modded class CarTent //forçar um override para evitar outros mods
 
     override bool CanDisplayAttachmentCategory( string category_name )
 	{
-		if (VSM_IsOpen())
+		if (VSM_CanManipule())
             return super.CanDisplayAttachmentCategory(category_name);
 
         return false;

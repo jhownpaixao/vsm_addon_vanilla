@@ -1,30 +1,16 @@
 modded class ShelterBase
 {
     protected ref OpenableBehaviour m_Openable;
-    protected bool m_IsOpenedLocal;
-
-    void ShelterBase()
-    {
-        VSM_StartAutoClose();
-    }
 
     override void InitItemVariables()
     {
-        super.InitItemVariables();
-        
         m_Openable = new OpenableBehaviour(false);
         RegisterNetSyncVariableBool("m_Openable.m_IsOpened");
+
+        super.InitItemVariables();
     }
 
-    override void SetActions()
-    {
-        super.SetActions();
-
-        AddAction(ActionVSM_Open);
-        AddAction(ActionVSM_Close);
-    }
-
-    // so aceita itens se estiver aberto
+    //Behaviour overrides----------------------------------------
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
         if (VSM_CanManipule())
@@ -43,13 +29,10 @@ modded class ShelterBase
 
     override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
-        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
-        if (VSM_IsOpen() /* && !VSM_IsProcessing() */) 
+        if (VSM_CanManipule()) 
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
-
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
@@ -76,24 +59,15 @@ modded class ShelterBase
         return false;
     }
 
-
-    //! virtualização
-    override bool VSM_CanVirtualize()
+    override void SetActions()
     {
-        CarScript carParent = CarScript.Cast(GetHierarchyParent());
-        if (carParent)
-        {
-            InventoryLocation location = new InventoryLocation();
-            GetInventory().GetCurrentInventoryLocation(location);
+        super.SetActions();
 
-            int slotID = location.GetSlot();
-            if (slotID != -1)
-                return false;
-        }
-
-        return true;
+        AddAction(ActionVSM_Open);
+        AddAction(ActionVSM_Close);
     }
 
+    //VSM adjustments----------------------------------------
     override bool VSM_IsOpen()
     {
         return m_Openable.IsOpened();
@@ -101,38 +75,24 @@ modded class ShelterBase
 
     override void VSM_Open()
     {
-        if(VSM_IsProcessing())
+        if (VSM_CanOpen())
         {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
-        }
-        
-        super.VSM_Open();
-
-        if (!VSM_IsOpen())
-        {
+            super.VSM_Open();
             m_Openable.Open();
 
-            if (GetGame().IsServer())
-                VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+            if (GetGame().IsServer() && VSM_IsOpen())
+                VirtualStorageModule.GetModule().OnLoadVirtualStore(this);  
         }
     }
 
     override void VSM_Close()
     {
-        if(VSM_IsProcessing())
-        {
-            VirtualUtils.OnLocalPlayerSendMessage("Items are being generated, please wait...");
-            return;
-        }
-
-        super.VSM_Close();
-
-        if (VSM_IsOpen())
+        if (VSM_CanClose())
         {
             if (GetGame().IsServer())
                 VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
-
+            
+            super.VSM_Close();
             m_Openable.Close();
         }
     }
@@ -154,35 +114,42 @@ modded class ShelterBase
     }
 
     override void OnDamageDestroyed(int oldLevel)
-	{
-		super.OnDamageDestroyed(oldLevel);
-		if (GetGame().IsServer())
+    {
+        super.OnDamageDestroyed(oldLevel);
+
+        if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDestroyed(this);
-	};
+    };
 
     override void OnStoreSave(ParamsWriteContext ctx)
-    {
-        super.OnStoreSave(ctx);
+	{
+		super.OnStoreSave(ctx);
+        if(VirtualStorageModule.GetModule().IsRemoving()) return;
 
-        if(!VirtualStorageModule.GetModule().IsRemoving())
-            ctx.Write(m_VSM_HasVirtualItems);
-    }
+        ctx.Write(m_VSM_HasVirtualItems);
+        ctx.Write(m_Openable.IsOpened());
+	}
+	
+	override bool OnStoreLoad(ParamsReadContext ctx, int version)
+	{
+		if(!super.OnStoreLoad(ctx, version)) return false;
 
-    override bool OnStoreLoad(ParamsReadContext ctx, int version)
-    {
-        if (!super.OnStoreLoad(ctx, version))
-            return false;
+        //TODO este seria o certo, mas os servers em produção ainda não tem este recurso e vão falhar
+        //TODO primeiro lançar uma att com ele, e na proxima desativa-lo
+		// if(VSM_Addon_Vanilla.GetAddon().IsNew()) return true; 
+
+        if(!ctx.Read(m_VSM_HasVirtualItems)) return false;
+
         
-        if(!VirtualStorageModule.GetModule().IsNew())
-            ctx.Read(m_VSM_HasVirtualItems);
+        if(VSM_Addon_Vanilla.GetAddon().GetLastVersion() > VSMAddonVanilla_StorageVersion.V_0000)
+        {
+            bool state;
+            if(!ctx.Read(state)) return false;
+            if(state) m_Openable.Open();
+        }
 
-        return true;
-    }
+        SetSynchDirty();
 
-    override void AfterStoreLoad()
-    {
-        super.AfterStoreLoad();
-        VSM_SetHasItems(m_VSM_HasVirtualItems);
-    }
-
+		return true;
+	}
 };

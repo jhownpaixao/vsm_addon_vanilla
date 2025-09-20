@@ -2,11 +2,6 @@ modded class TentBase
 {
     bool m_VSM_LastOpenState;
 
-    void TentBase()
-    {
-        VSM_StartAutoClose();
-    }
-
     override void InitItemVariables()
     {
         super.InitItemVariables();
@@ -15,7 +10,63 @@ modded class TentBase
         RegisterNetSyncVariableBool("m_VSM_LastOpenState");
     }
 
-    //! mesclar caracteristicas do storage para virtual
+    //Behaviour overrides----------------------------------------
+    override bool CanReceiveItemIntoCargo(EntityAI item)
+    {
+        if (VSM_CanManipule())
+            return super.CanReceiveItemIntoCargo(item);
+
+        return false;
+    }
+
+    override bool CanReleaseCargo(EntityAI cargo)
+    {
+        if (VSM_CanManipule())
+            return super.CanReleaseCargo(cargo);
+
+        return false;
+    }
+
+    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
+    {
+        if (VSM_CanManipule()) 
+            return super.CanReceiveAttachment(attachment, slotId);
+
+        return false;
+    }
+
+    override bool CanReleaseAttachment(EntityAI attachment)
+    {
+        if (VSM_CanManipule())
+            return super.CanReleaseAttachment(attachment);
+
+        return false;
+    }
+
+    override bool CanDisplayAttachmentSlot(int slot_id)
+    {
+        if (VSM_CanManipule())
+            return super.CanDisplayAttachmentSlot(slot_id);
+
+        return false;
+    }
+
+    override bool CanDisplayCargo()
+    {
+        if (VSM_CanManipule())
+           return super.CanDisplayCargo();
+            
+        return false;
+    }
+
+    override bool CanDisplayAttachmentCategory( string category_name )
+	{
+		if (VSM_CanManipule())
+            return super.CanDisplayAttachmentCategory(category_name);
+
+        return false;
+	}
+
     override bool CanBePacked()
     {
         if (super.CanBePacked())
@@ -40,76 +91,21 @@ modded class TentBase
                 if (selection.Contains("entrance") || selection.Contains("door"))
                 {
                     if (VSM_IsOpen())
+                    {
                         VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
+                        VSM_GetAutoCloseBehavior().Start();
+                    }
                     else
+                    {
                         VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
+                        VSM_GetAutoCloseBehavior().Stop();
+                    }    
                 }
-                SetSynchDirty();
             }
         }
-
     }
-
-    override bool CanReceiveItemIntoCargo(EntityAI item)
-    {
-        if (VSM_CanManipule())
-            return super.CanReceiveItemIntoCargo(item);
-
-        return false;
-    }
-
-    override bool CanReleaseCargo(EntityAI cargo)
-    {
-        if (VSM_CanManipule())
-            return super.CanReleaseCargo(cargo);
-
-        return false;
-    }
-
-    override bool CanReceiveAttachment(EntityAI attachment, int slotId)
-    {
-        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
-        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
-        if (VSM_IsOpen() /* && !VSM_CanManipule() */)
-            return super.CanReceiveAttachment(attachment, slotId);
-
-        return false;
-
-    }
-
-    override bool CanReleaseAttachment(EntityAI attachment)
-    {
-        if (VSM_CanManipule())
-            return super.CanReleaseAttachment(attachment);
-
-        return false;
-    }
-
-    override bool CanDisplayAttachmentSlot(int slot_id)
-    {
-        if (VSM_CanManipule())
-            return super.CanDisplayAttachmentSlot(slot_id);
-
-        return false;
-    }
-
-    override bool CanDisplayCargo()
-    {
-        if (VSM_IsOpen())
-            return super.CanDisplayCargo();
-
-        return false;
-    }
-
-    override bool CanDisplayAttachmentCategory(string category_name)
-    {
-        if (VSM_CanManipule())
-            return super.CanDisplayAttachmentCategory(category_name);
-
-        return false;
-    }
-
-    //! virtualização
+    
+    //VSM adjustments----------------------------------------
     override bool VSM_IsOpen()
     {
         if (m_State != PACKED)
@@ -125,7 +121,7 @@ modded class TentBase
                 component = toggle.GetToggleOff(); //either one works
                 component.ToLower();
 
-                if (!is_closed)
+                if ((component.Contains("entrance") || component.Contains("door")) && !is_closed)
                     return true;
             }
         }
@@ -135,7 +131,6 @@ modded class TentBase
 
     override void VSM_Open()
     {
-
         if (VSM_IsOpen())
             return;
 
@@ -151,7 +146,9 @@ modded class TentBase
             component.ToLower();
 
             if (is_closed)
+            {
                 ToggleAnimation(component);
+            }   
         }
     }
 
@@ -165,7 +162,7 @@ modded class TentBase
         ToggleAnimations toggle;
 
         for (int i = 0; i < m_ToggleAnimations.Count(); i++)
-        {
+        {   
             toggle = m_ToggleAnimations.GetKey(i);
             is_closed = m_OpeningMask & toggle.GetOpeningBit();
             component = toggle.GetToggleOff(); //either one works
@@ -194,7 +191,6 @@ modded class TentBase
 
         if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDeleteContainer(this);
-
     }
 
     override void OnDamageDestroyed(int oldLevel)
@@ -204,35 +200,33 @@ modded class TentBase
             VirtualStorageModule.GetModule().OnDestroyed(this);
 
         VSM_Open();
-        VSM_StopAutoClose();
+        VSM_GetAutoCloseBehavior().Stop();
     }
 
     override void OnStoreSave(ParamsWriteContext ctx)
-    {
-        super.OnStoreSave(ctx);
+	{
+		super.OnStoreSave(ctx);
+        if(VirtualStorageModule.GetModule().IsRemoving()) return;
 
-        if (!VirtualStorageModule.GetModule().IsRemoving())
-            ctx.Write(m_VSM_HasVirtualItems);
-    }
+        ctx.Write(m_VSM_HasVirtualItems);
+	}
+	
+	override bool OnStoreLoad(ParamsReadContext ctx, int version)
+	{
+		if(!super.OnStoreLoad(ctx, version)) return false;
+        
+		//TODO este seria o certo, mas os servers em produção ainda não tem este recurso e vão falhar
+        //TODO primeiro lançar uma att com ele, e na proxima desativa-lo
+		// if(VSM_Addon_Vanilla.GetAddon().IsNew()) return true; 
 
-    override bool OnStoreLoad(ParamsReadContext ctx, int version)
-    {
-        if (!super.OnStoreLoad(ctx, version))
-            return false;
+        if(!ctx.Read(m_VSM_HasVirtualItems)) return false;
 
-        if (!VirtualStorageModule.GetModule().IsNew())
-            ctx.Read(m_VSM_HasVirtualItems);
+        SetSynchDirty();
 
-        return true;
-    }
+		return true;
+	}
 
-    override void AfterStoreLoad()
-    {
-        super.AfterStoreLoad();
-        VSM_SetHasItems(m_VSM_HasVirtualItems);
-    }
-
-    //! utils
+    //Utils----------------------------------------
     bool IsSelectionRuined(string selection)
     {
         string zone;

@@ -1,6 +1,5 @@
 modded class ActionToggleTentOpen
 {
-
 	override void OnExecuteServer( ActionData action_data )
 	{
 		Object targetObject = action_data.m_Target.GetObject();

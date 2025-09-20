@@ -1,5 +1,6 @@
 modded class PartyTent //forçar um override para evitar outros mods
 {
+    //Behaviour overrides----------------------------------------
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
         if (VSM_CanManipule())
@@ -18,9 +19,7 @@ modded class PartyTent //forçar um override para evitar outros mods
 
     override bool CanReceiveAttachment(EntityAI attachment, int slotId)
     {
-        //!desativar por enquanto, está impedindo a criação de attachments mesmo vindo do módulo de virtualização
-        //TODO: formular um método de criação dos attachments apartir do módulo, ao mesmo tempo que não permite o player mexer...
-        if (VSM_IsOpen() /* && !VSM_IsProcessing() */) 
+        if (VSM_CanManipule()) 
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
@@ -45,7 +44,7 @@ modded class PartyTent //forçar um override para evitar outros mods
     override bool CanDisplayCargo()
     {
         if (VSM_CanManipule())
-            return super.CanDisplayCargo();
+           return super.CanDisplayCargo();
             
         return false;
     }

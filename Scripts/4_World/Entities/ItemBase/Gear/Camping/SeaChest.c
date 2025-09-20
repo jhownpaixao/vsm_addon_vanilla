@@ -3,29 +3,15 @@ modded class SeaChest
     protected ref OpenableBehaviour m_Openable;
     protected bool m_IsOpenedLocal;
 
-    void SeaChest()
-    {
-        VSM_StartAutoClose();
-    }
-
     override void InitItemVariables()
     {
         super.InitItemVariables();
-
+        
         m_Openable = new OpenableBehaviour(false);
         RegisterNetSyncVariableBool("m_Openable.m_IsOpened");
     }
 
-    //adciona ações de abrir e fechar
-    override void SetActions()
-    {
-        super.SetActions();
-
-        AddAction(ActionVSM_Open);
-        AddAction(ActionVSM_Close);
-    }
-
-    // ao colocar em algum veiculo (por exemplo), restaura os itens
+    //Behaviour overrides----------------------------------------
     override void OnWasAttached(EntityAI parent, int slot_id)
     {
         super.OnWasAttached(parent, slot_id);
@@ -33,7 +19,6 @@ modded class SeaChest
         VSM_Open();
     }
 
-    // ao remover de algum veiculo (por exemplo), fecha
     override void OnWasDetached(EntityAI parent, int slot_id)
     {
         super.OnWasDetached(parent, slot_id);
@@ -41,10 +26,9 @@ modded class SeaChest
         VSM_Close();
     }
 
-    // so aceita itens se estiver aberto
     override bool CanReceiveItemIntoCargo(EntityAI item)
     {
-        if (VSM_CanManipule()|| VSM_IsAttachedOnVehicle())
+        if (VSM_CanManipule() || VSM_IsAttachedOnVehicle())
             return super.CanReceiveItemIntoCargo(item);
 
         return false;
@@ -64,7 +48,6 @@ modded class SeaChest
             return super.CanReceiveAttachment(attachment, slotId);
 
         return false;
-
     }
 
     override bool CanReleaseAttachment(EntityAI attachment)
@@ -91,7 +74,6 @@ modded class SeaChest
         return false;
     }
 
-
     override bool IsTakeable()
     {
         return true;
@@ -102,9 +84,29 @@ modded class SeaChest
         return true;
     }
 
-    //! virtualização
+    override void SetActions()
+    {
+        super.SetActions();
+
+        AddAction(ActionVSM_Open);
+        AddAction(ActionVSM_Close);
+    }
+
+    //VSM adjustments----------------------------------------
+    override bool VSM_IsVirtualizable()
+    {
+        if(super.VSM_IsVirtualizable())
+        {
+            //! Não pode ser virtualizado por outro storage se tiver itens virtuais ou for attachment
+            return !VSM_HasVirtualItems() && !GetInventory().IsAttachment();
+        }
+        
+        return true;
+    }
+    
     override bool VSM_CanVirtualize()
     {
+        //! Não pode virtualizar se estiver em um veículo
         return !VSM_IsAttachedOnVehicle();
     }
 
@@ -122,28 +124,22 @@ modded class SeaChest
 
             if (GetGame().IsServer() && VSM_IsOpen())
                 VirtualStorageModule.GetModule().OnLoadVirtualStore(this);
-            
-            SetSynchDirty();
         }
     }
 
     override void VSM_Close()
     {
-        if (VSM_IsAttachedOnVehicle())
-        {
-            VSM_StartAutoClose(); //reinicia ciclo
-        }
-        else if (VSM_CanClose())
+        if (VSM_CanClose())
         {
             if (GetGame().IsServer())
                 VirtualStorageModule.GetModule().OnSaveVirtualStore(this);
             
             super.VSM_Close();
             m_Openable.Close();
-			SetSynchDirty();
         }
     }
 
+    //VSM Wrapper events ----------------------------------------
     override void EEInit()
     {
         super.EEInit();
@@ -161,37 +157,44 @@ modded class SeaChest
     }
 
     override void OnDamageDestroyed(int oldLevel)
-    {
-        super.OnDamageDestroyed(oldLevel);
-        if (GetGame().IsServer())
+	{
+		super.OnDamageDestroyed(oldLevel);
+		if (GetGame().IsServer())
             VirtualStorageModule.GetModule().OnDestroyed(this);
-    };
+	};
 
     override void OnStoreSave(ParamsWriteContext ctx)
-    {
-        super.OnStoreSave(ctx);
+	{
+		super.OnStoreSave(ctx);
+        if(VirtualStorageModule.GetModule().IsRemoving()) return;
+        
+        ctx.Write(m_VSM_HasVirtualItems);
+        ctx.Write(m_Openable.IsOpened());
+	}
+	
+	override bool OnStoreLoad(ParamsReadContext ctx, int version)
+	{
+		if(!super.OnStoreLoad(ctx, version)) return false;
 
-        if(!VirtualStorageModule.GetModule().IsRemoving())
-            ctx.Write(m_VSM_HasVirtualItems);
-    }
+        //TODO este seria o certo, mas os servers em produção ainda não tem este recurso e vão falhar
+        //TODO primeiro lançar uma att com ele, e na proxima desativa-lo
+		// if(VSM_Addon_Vanilla.GetAddon().IsNew()) return true; 
 
-    override bool OnStoreLoad(ParamsReadContext ctx, int version)
-    {
-        if (!super.OnStoreLoad(ctx, version))
-            return false;
+        if(!ctx.Read(m_VSM_HasVirtualItems)) return false;
+        
+        if(VSM_Addon_Vanilla.GetAddon().GetLastVersion() > VSMAddonVanilla_StorageVersion.V_0000)
+        {
+            bool state;
+            if(!ctx.Read(state)) return false;
+            if(state) m_Openable.Open();
+        }
 
-        if(!VirtualStorageModule.GetModule().IsNew())
-            ctx.Read(m_VSM_HasVirtualItems);
-            
-        return true;
-    }
+        SetSynchDirty();
 
-    override void AfterStoreLoad()
-    {
-        super.AfterStoreLoad();
-        VSM_SetHasItems(m_VSM_HasVirtualItems);
-    }
+		return true;
+	}
 
+    //! compatibilidade---------------------------------------------------
     override void VSM_OnBeforeVirtualize()
     {
         super.VSM_OnBeforeVirtualize();
@@ -199,4 +202,24 @@ modded class SeaChest
         if (!VSM_IsOpen()) //! se estiver fechado, os itens são perdidos, caso seja virtualizado dentro de outro container
             VSM_Open();
     }
+
+    override void VSM_OnBeforeRestoreChildren() 
+    {
+        super.VSM_OnBeforeRestoreChildren();
+
+        //! abrir para restauarar os filhos (senão bloqueia)
+        m_Openable.Open();
+        SetSynchDirty();
+    }
+
+    override void VSM_OnAfterRestore() 
+    {
+        super.VSM_OnAfterRestore();
+        
+        if (!VSM_IsAttachedOnVehicle())
+        {
+            VSM_Close();
+        }
+    } 
+    //! ---------------------------------------------------
 };
